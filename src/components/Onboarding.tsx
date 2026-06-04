@@ -265,8 +265,8 @@ export default function Onboarding() {
 
         {/* ── Hero ─────────────────────────────── */}
         <View style={styles.hero}>
-          <View style={styles.logoWrap}>
-            <MaterialCommunityIcons name="wallet-giftcard" size={44} color="#fff" />
+          <View style={[styles.logoWrap, { backgroundColor: 'transparent' }]}>
+            <Image source={require('@/assets/images/icon.png')} style={{ width: 80, height: 80, borderRadius: 20 }} />
           </View>
           <Text style={styles.appName}>FinTech Guinée</Text>
           <Text style={styles.tagline}>

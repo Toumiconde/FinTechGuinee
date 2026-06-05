@@ -122,6 +122,10 @@ const expenseSlice = createSlice({
       });
       state.statistics = recalcStats(state.expenses);
     },
+    setExpenses: (state, action: PayloadAction<Expense[]>) => {
+      state.expenses = action.payload;
+      state.statistics = recalcStats(state.expenses);
+    },
   },
 });
 
@@ -132,6 +136,7 @@ export const {
   confirmPlannedExpense,
   deleteExpense,
   confirmAllPlannedForMonth,
+  setExpenses,
 } = expenseSlice.actions;
 
 export default expenseSlice.reducer;

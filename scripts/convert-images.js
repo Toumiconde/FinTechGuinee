@@ -1,4 +1,4 @@
-const Jimp = require('jimp');
+const { Jimp } = require('jimp');
 const path = require('path');
 
 const imagesToConvert = [
@@ -17,7 +17,7 @@ async function convertImages() {
       const image = await Jimp.read(fullPath);
       
       console.log(`Writing ${relativePath} as true PNG...`);
-      await image.writeAsync(fullPath);
+      await image.write(fullPath);
       console.log(`✅ ${relativePath} converti avec succès !`);
     } catch (error) {
       console.error(`❌ Erreur lors de la conversion de ${relativePath} :`, error);

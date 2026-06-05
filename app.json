@@ -8,9 +8,11 @@
     "scheme": "fintechguinee",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "com.toumiconde.fintechguinee"
     },
     "android": {
+      "package": "com.toumiconde.fintechguinee",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -40,6 +42,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "a5d254c3-7374-438f-8a02-272d416130d3"
+      }
     }
   }
 }

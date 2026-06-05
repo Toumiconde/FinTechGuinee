@@ -2,15 +2,18 @@ import React, { useState } from 'react';
 import {
   View, Text, TextInput, StyleSheet, Pressable,
   KeyboardAvoidingView, Platform, Image, ScrollView, StatusBar,
+  ActivityIndicator,
 } from 'react-native';
 import { useDispatch } from 'react-redux';
-import { registerUser } from '../redux/userSlice';
+import { registerUser, setFullProfile } from '../redux/userSlice';
+import { setExpenses } from '../redux/expenseSlice';
 import { useTheme } from '../context/ThemeContext';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { Radius, Shadows, Spacing, Typography } from '../constants/designTokens';
 import { useTranslation } from '../i18n/I18nContext';
+import { supabase } from '../utils/supabaseClient';
 
 const AVATAR_OPTIONS = ['Felix', 'Aneka', 'Oliver', 'Jasper', 'Chloe', 'Max', 'Luna'];
 
@@ -36,6 +39,7 @@ export default function Onboarding() {
   const [phone,     setPhone]     = useState('');
   const [avatarSeed, setAvatarSeed] = useState('Felix');
   const [avatarUri,  setAvatarUri]  = useState<string | null>(null);
+  const [loading,    setLoading]    = useState(false);
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -52,10 +56,18 @@ export default function Onboarding() {
       alert(language === 'en' ? 'Please enter your first and last name.' : 'Veuillez entrer votre nom et prénom.');
       return;
     }
+    const cleanPhone = phone.trim();
+    if (!cleanPhone) {
+      alert(language === 'en' ? 'Please enter your phone number to synchronize your data.' : 'Veuillez entrer votre numéro de téléphone pour synchroniser vos données.');
+      return;
+    }
+
+    setLoading(true);
+
     const userData = {
       firstName: firstName.trim(),
       lastName: lastName.trim(),
-      phone: phone.trim(),
+      phone: cleanPhone,
       avatarSeed,
       avatarUri,
       securityMode: 'none' as const,
@@ -63,11 +75,99 @@ export default function Onboarding() {
       notificationsEnabled: false,
       language: language,
     };
-    dispatch(registerUser(userData));
+
     try {
+      // 1. Vérifier si le profil existe déjà sur Supabase
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('phone', cleanPhone)
+        .maybeSingle();
+
+      if (profileError) {
+        throw new Error(profileError.message);
+      }
+
+      if (profile) {
+        // Utilisateur existant trouvé ! Restauration de ses données
+        alert(language === 'en' 
+          ? `Welcome back, ${profile.first_name}! Restoring your transactions...` 
+          : `Ravi de vous revoir, ${profile.first_name} ! Restauration de vos données...`
+        );
+
+        // Récupérer ses dépenses
+        const { data: dbExpenses, error: expensesError } = await supabase
+          .from('expenses')
+          .select('*')
+          .eq('phone', cleanPhone);
+
+        if (expensesError) {
+          console.error('Failed to fetch expenses from Supabase', expensesError);
+        }
+
+        const loadedProfile = {
+          firstName: profile.first_name,
+          lastName: profile.last_name,
+          phone: profile.phone,
+          avatarSeed: profile.avatar_seed || 'Felix',
+          avatarUri: profile.avatar_uri,
+          isRegistered: true,
+          securityMode: 'none' as const,
+          biometricEnabled: false,
+          notificationsEnabled: false,
+          language: profile.language || language,
+          currency: profile.currency || 'GNF',
+        };
+
+        const mappedExpenses = (dbExpenses || []).map((exp: any) => ({
+          id: isNaN(Number(exp.id)) ? Date.now() + Math.random() : Number(exp.id),
+          category: exp.category,
+          amount: Number(exp.amount),
+          currency: exp.currency || 'GNF',
+          description: exp.description,
+          icon: exp.icon || 'receipt',
+          date: exp.date,
+          status: exp.status || 'real',
+          type: exp.type || 'expense',
+        }));
+
+        dispatch(setFullProfile(loadedProfile));
+        dispatch(setExpenses(mappedExpenses));
+
+        // Sauvegarde locale complémentaire
+        await AsyncStorage.setItem('@user_profile', JSON.stringify(loadedProfile));
+      } else {
+        // Nouvel utilisateur ! On le crée sur Supabase
+        const { error: insertError } = await supabase
+          .from('profiles')
+          .insert({
+            phone: cleanPhone,
+            first_name: firstName.trim(),
+            last_name: lastName.trim(),
+            avatar_seed: avatarSeed,
+            avatar_uri: avatarUri,
+            currency: 'GNF',
+            language: language,
+          });
+
+        if (insertError) {
+          throw new Error(insertError.message);
+        }
+
+        dispatch(registerUser(userData));
+        await AsyncStorage.setItem('@user_profile', JSON.stringify({ ...userData, isRegistered: true }));
+      }
+    } catch (err: any) {
+      console.warn('Supabase sync error, falling back to local mode:', err.message);
+      // Mode hors-ligne en cas d'erreur de connexion
+      alert(language === 'en'
+        ? 'Connection issue. Starting in Offline Mode. Data will be saved locally.'
+        : 'Problème de connexion. Démarrage en Mode Hors-ligne. Vos données seront sauvegardées localement.'
+      );
+      dispatch(registerUser(userData));
       await AsyncStorage.setItem('@user_profile', JSON.stringify({ ...userData, isRegistered: true }));
-    } catch (e) {
-      console.error('Failed to save profile', e);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -356,7 +456,7 @@ export default function Onboarding() {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>{language === 'en' ? 'Phone (optional)' : 'Téléphone (optionnel)'}</Text>
+            <Text style={styles.label}>{language === 'en' ? 'Phone *' : 'Téléphone *'}</Text>
             <View style={styles.inputWrap}>
               <MaterialCommunityIcons name="phone-outline" size={20} color={colors.textMuted} />
               <TextInput
@@ -371,9 +471,15 @@ export default function Onboarding() {
           </View>
 
           {/* CTA */}
-          <Pressable style={styles.cta} onPress={handleStart}>
-            <MaterialCommunityIcons name="rocket-launch-outline" size={22} color="#fff" />
-            <Text style={styles.ctaText}>{language === 'en' ? 'Start now' : 'Commencer maintenant'}</Text>
+          <Pressable style={styles.cta} onPress={handleStart} disabled={loading}>
+            {loading ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <>
+                <MaterialCommunityIcons name="rocket-launch-outline" size={22} color="#fff" />
+                <Text style={styles.ctaText}>{language === 'en' ? 'Start now' : 'Commencer maintenant'}</Text>
+              </>
+            )}
           </Pressable>
         </View>
 

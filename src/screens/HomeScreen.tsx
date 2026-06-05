@@ -127,20 +127,15 @@ export default function HomeScreen() {
         if (!selectedMonthKey || isLoading || autoModalShownFor === selectedMonthKey) return;
 
         AsyncStorage.getItem(`@forecast_${selectedMonthKey}`).then(raw => {
-            if (!raw) {
-                if (!isPastMonth(selectedMonthKey)) {
-                    setAutoModalShownFor(selectedMonthKey);
-                    setForecastMonthKey(selectedMonthKey);
-                    setForecastModalVisible(true);
-                }
+            // N'affiche automatiquement le modal QUE si aucun forecast n'existe encore
+            // Si un forecast existe (même non confirmé), l'utilisateur l'a déjà vu → ne pas re-ouvrir
+            if (!raw && !isPastMonth(selectedMonthKey)) {
+                setAutoModalShownFor(selectedMonthKey);
+                setForecastMonthKey(selectedMonthKey);
+                setForecastModalVisible(true);
             } else {
-                const data = JSON.parse(raw);
-                if (data.status !== 'confirmed') {
-                    // Show the forecast modal directly so the user can see their pending inputs
-                    setAutoModalShownFor(selectedMonthKey);
-                    setForecastMonthKey(selectedMonthKey);
-                    setForecastModalVisible(true);
-                }
+                // Marquer comme "déjà traité" pour ce mois même si on n'ouvre pas le modal
+                setAutoModalShownFor(selectedMonthKey);
             }
         });
     }, [selectedMonthKey, isLoading, autoModalShownFor]);

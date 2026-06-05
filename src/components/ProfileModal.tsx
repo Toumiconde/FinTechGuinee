@@ -26,6 +26,8 @@ export default function ProfileModal({ visible, onClose, onLockApp }: Props) {
   const { theme, toggleTheme, colors } = useTheme();
   const dispatch = useDispatch();
   const user = useSelector((state: RootState) => state.user);
+  // Lire la langue directement depuis Redux pour que l'UI se mette à jour immédiatement
+  const currentLanguage = useSelector((state: RootState) => state.user.language || 'fr');
 
   const [activeTab, setActiveTab] = useState<Tab>('profile');
 
@@ -267,7 +269,8 @@ export default function ProfileModal({ visible, onClose, onLockApp }: Props) {
     }
   };
 
-  const getTranslated = (fr: string, en: string) => language === 'en' ? en : fr;
+  // Utilise currentLanguage (depuis Redux) pour que la modale se mette à jour instantanément
+  const getTranslated = (fr: string, en: string) => currentLanguage === 'en' ? en : fr;
 
   const s = StyleSheet.create({
     overlay: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'flex-end' },
@@ -558,9 +561,13 @@ export default function ProfileModal({ visible, onClose, onLockApp }: Props) {
         { id: 'fr', label: 'Français' },
         { id: 'en', label: 'English' }
       ].map(lang => (
-        <Pressable key={lang.id} style={s.menuItem} onPress={() => { setLanguage(lang.id); handleInstantSave({ language: lang.id }); }}>
+        <Pressable key={lang.id} style={s.menuItem} onPress={() => {
+          setLanguage(lang.id);
+          // Dispatch immédiat vers Redux pour que tout le projet se mette à jour
+          dispatch(updateProfile({ language: lang.id }));
+        }}>
           <Text style={s.menuTitle}>{lang.label}</Text>
-          {language === lang.id && <MaterialCommunityIcons name="check-circle" size={24} color={colors.primary} />}
+          {currentLanguage === lang.id && <MaterialCommunityIcons name="check-circle" size={24} color={colors.primary} />}
         </Pressable>
       ))}
     </ScrollView>

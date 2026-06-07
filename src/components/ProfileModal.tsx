@@ -19,6 +19,8 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { StorageAccessFramework } from 'expo-file-system/legacy';
 
 import { normalizePhone } from '../utils/phone';
+import { supabase } from '../utils/supabaseClient';
+import { ActivityIndicator } from 'react-native';
 
 interface Props { visible: boolean; onClose: () => void; onLockApp?: () => void; }
 
@@ -30,6 +32,8 @@ export default function ProfileModal({ visible, onClose, onLockApp }: Props) {
   const user = useSelector((state: RootState) => state.user);
   // Lire la langue directement depuis Redux pour que l'UI se mette à jour immédiatement
   const currentLanguage = useSelector((state: RootState) => state.user.language || 'fr');
+  const [syncLoading, setSyncLoading] = useState(false);
+  const expenses = useSelector((state: RootState) => state.expenses.expenses);
 
   const [activeTab, setActiveTab] = useState<Tab>('profile');
 
@@ -215,6 +219,72 @@ export default function ProfileModal({ visible, onClose, onLockApp }: Props) {
     }
 
     onClose();
+  };
+
+  const handleSyncCloud = async () => {
+    if (!user.phone) {
+      Alert.alert(
+        language === 'fr' ? "Erreur" : "Error",
+        language === 'fr' 
+          ? "Vous devez avoir un numéro de téléphone configuré pour synchroniser avec le Cloud."
+          : "You must have a phone number configured to sync with the Cloud."
+      );
+      return;
+    }
+    setSyncLoading(true);
+    try {
+      const { data: remoteExpenses, error } = await supabase
+        .from('expenses')
+        .select('id')
+        .eq('phone', user.phone);
+      
+      if (error) throw error;
+      
+      const remoteIds = new Set(remoteExpenses.map((r: any) => String(r.id)));
+      const missingExpenses = expenses.filter((e: any) => !remoteIds.has(String(e.id)));
+      
+      if (missingExpenses.length === 0) {
+        Alert.alert(
+          language === 'fr' ? "Synchronisation" : "Sync",
+          language === 'fr' ? "Toutes vos données locales sont déjà à jour avec le Cloud !" : "All your local data is already up to date with the Cloud!"
+        );
+        setSyncLoading(false);
+        return;
+      }
+      
+      const rows = missingExpenses.map((e: any) => ({
+        id: e.id.toString(),
+        phone: user.phone,
+        category: e.category,
+        amount: e.amount,
+        currency: e.currency || 'GNF',
+        description: e.description || '',
+        icon: e.icon || 'receipt',
+        date: e.date,
+        status: e.status || 'real',
+        type: e.type || 'expense',
+      }));
+      
+      const { error: insertError } = await supabase.from('expenses').insert(rows);
+      if (insertError) throw insertError;
+      
+      Alert.alert(
+        language === 'fr' ? "Succès" : "Success",
+        language === 'fr' 
+          ? `${rows.length} dépense(s) ont été synchronisées vers le Cloud.`
+          : `${rows.length} transaction(s) were synced to the Cloud.`
+      );
+    } catch (err: any) {
+      console.error('Manual sync error:', err);
+      Alert.alert(
+        language === 'fr' ? "Erreur" : "Error",
+        language === 'fr'
+          ? "Impossible de se connecter au Cloud. Vérifiez votre connexion internet."
+          : "Unable to connect to the Cloud. Check your internet connection."
+      );
+    } finally {
+      setSyncLoading(false);
+    }
   };
 
   const handleLogout = () => {
@@ -446,6 +516,21 @@ export default function ProfileModal({ visible, onClose, onLockApp }: Props) {
           <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textMuted} />
         </Pressable>
       )}
+
+      <Pressable style={s.menuItem} onPress={handleSyncCloud}>
+        <View style={s.menuItemLeft}>
+          {syncLoading ? (
+            <ActivityIndicator size="small" color={colors.primary} style={{ marginRight: 8 }} />
+          ) : (
+            <MaterialCommunityIcons name="cloud-sync" size={24} color={colors.primary} />
+          )}
+          <View>
+            <Text style={s.menuTitle}>{getTranslated("Synchronisation Cloud", "Sync Cloud")}</Text>
+            <Text style={s.menuSub}>{getTranslated("Envoyer les données hors ligne vers Supabase", "Upload offline data to Supabase")}</Text>
+          </View>
+        </View>
+        <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textMuted} />
+      </Pressable>
 
       <Pressable style={s.menuItem} onPress={() => setActiveTab('about')}>
         <View style={s.menuItemLeft}>

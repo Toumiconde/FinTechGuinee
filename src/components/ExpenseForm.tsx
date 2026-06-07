@@ -11,6 +11,7 @@ import {
   Text,
   TextInput,
   View,
+  Vibration,
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../redux/store';
@@ -146,6 +147,10 @@ export default function ExpenseForm({
         date: finalDate,
         type: txType,
       }));
+    }
+
+    if (Platform.OS !== 'web') {
+      Vibration.vibrate(60);
     }
 
     setAmount('');

@@ -102,8 +102,8 @@ const expenseSlice = createSlice({
       }
     },
 
-    deleteExpense: (state, action: PayloadAction<number>) => {
-      state.expenses = state.expenses.filter(e => e.id !== action.payload);
+    deleteExpense: (state, action: PayloadAction<number | string>) => {
+      state.expenses = state.expenses.filter(e => String(e.id) !== String(action.payload));
       state.statistics = recalcStats(state.expenses);
     },
 
@@ -126,6 +126,15 @@ const expenseSlice = createSlice({
       state.expenses = action.payload;
       state.statistics = recalcStats(state.expenses);
     },
+    upsertExpense: (state, action: PayloadAction<Expense>) => {
+      const index = state.expenses.findIndex(e => String(e.id) === String(action.payload.id));
+      if (index !== -1) {
+        state.expenses[index] = action.payload;
+      } else {
+        state.expenses.unshift(action.payload);
+      }
+      state.statistics = recalcStats(state.expenses);
+    },
   },
 });
 
@@ -137,6 +146,7 @@ export const {
   deleteExpense,
   confirmAllPlannedForMonth,
   setExpenses,
+  upsertExpense,
 } = expenseSlice.actions;
 
 export default expenseSlice.reducer;

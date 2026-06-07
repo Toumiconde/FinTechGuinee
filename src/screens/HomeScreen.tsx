@@ -44,6 +44,7 @@ import {
     isPastMonth,
 } from '../utils/dateUtils';
 import { useRecurringTransactions } from '../hooks/useRecurringTransactions';
+import { useSupabaseRealtime } from '../hooks/useSupabaseRealtime';
 import { Radius, Shadows, Spacing, Typography } from '../constants/designTokens';
 import { useTranslation } from '../i18n/I18nContext';
 
@@ -85,6 +86,7 @@ export default function HomeScreen() {
 
     // ── Hooks ───────────────────────────────────────────────────────────────
     useRecurringTransactions();
+    useSupabaseRealtime();
 
     const currentMonthKey = getCurrentMonthKey();
 

@@ -100,6 +100,71 @@ export default function Dashboard({
   const balance       = totalIncome - totalExpenses;
   const count         = realTransactions.length;
 
+  // ── Idea B: Budget Alerts ──────────────────────────────────────────────────
+  const budgetAlerts = React.useMemo(() => {
+    if (!forecastData || !forecastData.budgets) return [];
+    const alerts: { category: string; spent: number; limit: number }[] = [];
+    
+    Object.entries(forecastData.budgets).forEach(([catName, limit]) => {
+      if (limit <= 0) return;
+      const spent = displayedExpenses
+        .filter((e: any) => (!e.type || e.type === 'expense') && e.category.toLowerCase() === catName.toLowerCase())
+        .reduce((s: number, cur: any) => s + cur.amount, 0);
+      
+      if (spent > limit) {
+        alerts.push({ category: catName, spent, limit });
+      }
+    });
+    return alerts;
+  }, [forecastData, displayedExpenses]);
+
+  // ── Idea A: Financial Health Score ──────────────────────────────────────────
+  const healthScore = React.useMemo(() => {
+    if (totalIncome === 0) {
+      if (totalExpenses > 0) return { grade: 'D', label: 'Déficit', color: colors.danger, text: language === 'en' ? 'Try to register an income to stabilize your budget.' : 'Essayez d\'enregistrer un revenu pour stabiliser votre budget.' };
+      return { grade: 'N/A', label: 'Aucune donnée', color: colors.textMuted, text: language === 'en' ? 'Add transactions to see your financial health score.' : 'Ajoutez des transactions pour voir votre score de santé financière.' };
+    }
+    
+    const savingsRate = (totalIncome - totalExpenses) / totalIncome;
+    
+    if (savingsRate >= 0.4) {
+      return {
+        grade: 'A+',
+        label: 'Excellente',
+        color: colors.success,
+        text: language === 'en' ? 'Excellent! You save a big part of your income. Keep going.' : 'Excellent ! Vous épargnez une grande partie de vos revenus. Continuez ainsi.'
+      };
+    } else if (savingsRate >= 0.2) {
+      return {
+        grade: 'A',
+        label: 'Très Bonne',
+        color: colors.success,
+        text: language === 'en' ? 'Great budget management. Your savings rate is very healthy.' : 'Très bonne gestion. Votre taux d\'épargne est très sain.'
+      };
+    } else if (savingsRate >= 0.05) {
+      return {
+        grade: 'B',
+        label: 'Bonne / Stable',
+        color: '#EAB308',
+        text: language === 'en' ? 'Stable budget. Try to reduce leisure expenses to save more.' : 'Budget stable. Essayez de réduire les loisirs pour épargner plus.'
+      };
+    } else if (savingsRate >= 0) {
+      return {
+        grade: 'C',
+        label: 'Moyenne / Limite',
+        color: '#F97316',
+        text: language === 'en' ? 'Caution! Your expenses are very close to your income.' : 'Attention ! Vos dépenses sont très proches de vos revenus.'
+      };
+    } else {
+      return {
+        grade: 'D',
+        label: 'Critique',
+        color: colors.danger,
+        text: language === 'en' ? 'Budget deficit! You spend more than you earn. Review your costs.' : 'Déficit budgétaire ! Vous dépensez plus que vous ne gagnez.'
+      };
+    }
+  }, [totalIncome, totalExpenses, colors, language]);
+
   const chartData = (() => {
   // existing pie chart data
   const grouped: Record<string, number> = {};
@@ -416,6 +481,66 @@ if (Platform.OS === 'web') {
       fontSize: Typography.sm,
       paddingVertical: Spacing.lg,
     },
+    // Health score card
+    healthCard: {
+      marginTop: Spacing.md,
+      backgroundColor: colors.surface,
+      borderRadius: Radius.xl,
+      padding: Spacing.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      ...Shadows.sm,
+    },
+    healthHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 8,
+    },
+    healthTitle: {
+      fontSize: Typography.sm,
+      fontWeight: Typography.bold,
+      color: colors.text,
+      flex: 1,
+    },
+    healthBadge: {
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: Radius.sm,
+    },
+    healthBadgeText: {
+      fontSize: Typography.xs,
+      fontWeight: Typography.bold,
+    },
+    healthText: {
+      fontSize: Typography.xs,
+      color: colors.textMuted,
+      lineHeight: 18,
+    },
+    // Budget alerts
+    alertContainer: {
+      marginTop: Spacing.md,
+      paddingTop: Spacing.sm,
+      borderStyle: 'solid',
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    alertHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginBottom: 6,
+    },
+    alertTitle: {
+      fontSize: Typography.xs,
+      fontWeight: 'bold',
+      color: colors.danger,
+    },
+    alertText: {
+      fontSize: Typography.xs,
+      color: colors.textMuted,
+      marginTop: 2,
+    },
   });
 
   return (
@@ -476,6 +601,41 @@ if (Platform.OS === 'web') {
           />
         </Animated.View>
       </Animated.View>
+
+      {/* ── Santé Financière & Alertes de Budget ── */}
+      {healthScore.grade !== 'N/A' && (
+        <Animated.View entering={FadeIn.duration(400)} style={styles.healthCard}>
+          <View style={styles.healthHeader}>
+            <MaterialCommunityIcons name="heart-pulse" size={20} color={healthScore.color} />
+            <Text style={styles.healthTitle}>
+              {language === 'en' ? 'Financial Health' : 'Santé Financière'}
+            </Text>
+            <View style={[styles.healthBadge, { backgroundColor: `${healthScore.color}22` }]}>
+              <Text style={[styles.healthBadgeText, { color: healthScore.color }]}>
+                {healthScore.grade} — {healthScore.label}
+              </Text>
+            </View>
+          </View>
+          <Text style={styles.healthText}>{healthScore.text}</Text>
+          
+          {/* Alertes de budget */}
+          {budgetAlerts.length > 0 && (
+            <View style={styles.alertContainer}>
+              <View style={styles.alertHeader}>
+                <MaterialCommunityIcons name="alert-decagram" size={16} color={colors.danger} />
+                <Text style={styles.alertTitle}>
+                  {language === 'en' ? 'Budget limits exceeded' : 'Budgets dépassés'} ({budgetAlerts.length})
+                </Text>
+              </View>
+              {budgetAlerts.map(alert => (
+                <Text key={alert.category} style={styles.alertText}>
+                  ⚠️ <Text style={{ fontWeight: 'bold' }}>{alert.category}</Text> : {formatGNF(alert.spent)} / {formatGNF(alert.limit)} max
+                </Text>
+              ))}
+            </View>
+          )}
+        </Animated.View>
+      )}
 
 
       {/* ── Bouton prévision ────────────────────────────────────────── */}

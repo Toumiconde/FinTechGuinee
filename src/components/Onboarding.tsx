@@ -15,6 +15,8 @@ import { Radius, Shadows, Spacing, Typography } from '../constants/designTokens'
 import { useTranslation } from '../i18n/I18nContext';
 import { supabase } from '../utils/supabaseClient';
 
+import { normalizePhone } from '../utils/phone';
+
 const AVATAR_OPTIONS = ['Felix', 'Aneka', 'Oliver', 'Jasper', 'Chloe', 'Max', 'Luna'];
 
 const FEATURES = [
@@ -56,7 +58,7 @@ export default function Onboarding() {
       alert(language === 'en' ? 'Please enter your first and last name.' : 'Veuillez entrer votre nom et prénom.');
       return;
     }
-    const cleanPhone = phone.trim();
+    const cleanPhone = normalizePhone(phone);
     if (!cleanPhone) {
       alert(language === 'en' ? 'Please enter your phone number to synchronize your data.' : 'Veuillez entrer votre numéro de téléphone pour synchroniser vos données.');
       return;

@@ -171,7 +171,7 @@ const supabaseSyncMiddleware = (storeAPI: any) => (next: any) => (action: any) =
               avatar_uri: userState.avatarUri,
               currency: userState.currency || 'GNF',
               language: userState.language || 'fr',
-            });
+            }, { onConflict: 'phone' });
           } catch (err) {
             console.error('Supabase sync profile error:', err);
           }

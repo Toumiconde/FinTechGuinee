@@ -18,6 +18,8 @@ import { requestNotificationPermissions, scheduleDailyReminder, cancelAllNotific
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { StorageAccessFramework } from 'expo-file-system/legacy';
 
+import { normalizePhone } from '../utils/phone';
+
 interface Props { visible: boolean; onClose: () => void; onLockApp?: () => void; }
 
 type Tab = 'profile' | 'settings' | 'security' | 'notifications' | 'language' | 'theme' | 'currency' | 'download' | 'about';
@@ -191,8 +193,10 @@ export default function ProfileModal({ visible, onClose, onLockApp }: Props) {
     }
     const timeString = `${notificationTime.getHours().toString().padStart(2, '0')}:${notificationTime.getMinutes().toString().padStart(2, '0')}`;
     
+    const normalizedPhone = normalizePhone(phone);
+
     const updatedProfile = {
-      firstName: firstName.trim(), lastName: lastName.trim(), phone: phone.trim(),
+      firstName: firstName.trim(), lastName: lastName.trim(), phone: normalizedPhone,
       avatarSeed, avatarUri,
       securityMode, customPin, customPassword, biometricEnabled, 
       notificationsEnabled, notificationTime: timeString,

@@ -1,6 +1,7 @@
 -- 1. Création de la table des profils
 CREATE TABLE IF NOT EXISTS public.profiles (
-    phone TEXT PRIMARY KEY,
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    phone TEXT UNIQUE,
     first_name TEXT NOT NULL,
     last_name TEXT NOT NULL,
     avatar_seed TEXT,

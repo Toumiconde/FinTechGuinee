@@ -8,6 +8,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../redux/store';
 import { updateProfile, logout } from '../redux/userSlice';
+import { setExpenses } from '../redux/expenseSlice';
 import * as ImagePicker from 'expo-image-picker';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { useTheme } from '../context/ThemeContext';
@@ -198,6 +199,65 @@ export default function ProfileModal({ visible, onClose, onLockApp }: Props) {
     const timeString = `${notificationTime.getHours().toString().padStart(2, '0')}:${notificationTime.getMinutes().toString().padStart(2, '0')}`;
     
     const normalizedPhone = normalizePhone(phone);
+
+    if (normalizedPhone && normalizedPhone !== user.phone) {
+      try {
+        const { data: existingProfile, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('phone', normalizedPhone)
+          .maybeSingle();
+        
+        if (existingProfile) {
+          const { data: remoteExpenses, error: expensesError } = await supabase
+            .from('expenses')
+            .select('*')
+            .eq('phone', normalizedPhone);
+          
+          if (!expensesError && remoteExpenses) {
+            const formattedExpenses = remoteExpenses.map((exp: any) => ({
+              id: isNaN(Number(exp.id)) ? exp.id : Number(exp.id),
+              category: exp.category,
+              amount: Number(exp.amount),
+              currency: exp.currency || 'GNF',
+              description: exp.description || '',
+              icon: exp.icon || 'receipt',
+              date: exp.date,
+              status: exp.status || 'real',
+              type: exp.type || 'expense',
+            }));
+            dispatch(setExpenses(formattedExpenses));
+          }
+
+          const restoredProfile = {
+            firstName: existingProfile.first_name,
+            lastName: existingProfile.last_name,
+            phone: normalizedPhone,
+            avatarSeed: existingProfile.avatar_seed || 'Felix',
+            avatarUri: existingProfile.avatar_uri,
+            securityMode,
+            customPin,
+            customPassword,
+            biometricEnabled,
+            notificationsEnabled,
+            notificationTime: timeString,
+            language,
+            exportDirectoryUri: exportDirUri,
+            themePreference,
+            currency: existingProfile.currency || currency,
+            isRegistered: true,
+            appLockEnabled: securityMode !== 'none',
+          };
+
+          dispatch(updateProfile(restoredProfile));
+          await AsyncStorage.setItem('@user_profile', JSON.stringify(restoredProfile));
+          onClose();
+          return;
+        }
+      } catch (err) {
+        console.error("Error checking phone change on Supabase:", err);
+      }
+    }
 
     const updatedProfile = {
       firstName: firstName.trim(), lastName: lastName.trim(), phone: normalizedPhone,

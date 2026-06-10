@@ -5,7 +5,7 @@ interface ExpenseState {
   expenses: Expense[];
   addExpense: (expense: Expense) => void;
   updateExpense: (expense: Expense) => void;
-  deleteExpense: (id: number) => void;
+  deleteExpense: (id: string) => void;
 }
 
 export const useExpenseStore = create<ExpenseState>((set) => ({

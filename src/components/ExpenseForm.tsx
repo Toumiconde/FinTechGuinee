@@ -1,25 +1,25 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import {
-  Alert,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  Vibration,
+    Alert,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    Vibration,
+    View,
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
-import { RootState } from '../redux/store';
-import { useTheme } from '../context/ThemeContext';
-import { Expense, addExpense, updateExpense } from '../redux/expenseSlice';
-import { getCategoryDetails } from '../utils/category';
 import { Radius, Shadows, Spacing, Typography } from '../constants/designTokens';
+import { useTheme } from '../context/ThemeContext';
 import { useTranslation } from '../i18n/I18nContext';
+import { Expense, addExpense, updateExpense } from '../redux/expenseSlice';
+import { RootState } from '../redux/store';
+import { getCategoryDetails } from '../utils/category';
 
 const QUICK_CATEGORIES_EXPENSE = [
   { name: 'Alimentation', icon: 'food-apple' },
@@ -66,6 +66,7 @@ export default function ExpenseForm({
     { name: 'Sante',        label: t('cat_health'), icon: 'pill' },
     { name: 'Education',    label: t('cat_education'), icon: 'school' },
     { name: 'Telecom',      label: 'Telecom', icon: 'wifi' },
+    { name: 'Tontine',      label: 'Tontine', icon: 'piggy-bank' },
     { name: 'Epargne',      label: t('cat_other'), icon: 'piggy-bank' },
     { name: 'Loisirs',      label: t('cat_leisure'), icon: 'gamepad-variant' },
   ];

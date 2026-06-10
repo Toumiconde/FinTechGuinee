@@ -1,21 +1,30 @@
-import React, { useState } from 'react';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Pressable, StyleSheet, Text, View, Platform, useWindowDimensions } from 'react-native';
-import { PieChart, BarChart } from 'react-native-chart-kit';
-import { useSelector } from 'react-redux';
-import { useTheme } from '../context/ThemeContext';
-import { RootState } from '../redux/store';
-import { getCategoryDetails } from '../utils/category';
-import { formatGNF } from '../utils/currency';
-import { getMonthKey, formatMonthKey, generateMonthRange } from '../utils/dateUtils';
-import Animated, { FadeIn } from 'react-native-reanimated';
-import { Radius, Shadows, Spacing, Typography } from '../constants/designTokens';
-import { useTranslation } from '../i18n/I18nContext';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import React, { useState } from 'react';
+import { Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { BarChart, PieChart } from 'react-native-chart-kit';
+import Animated, { FadeIn } from 'react-native-reanimated';
+import { useSelector } from 'react-redux';
+import { Radius, Shadows, Spacing, Typography } from '../constants/designTokens';
+import { useTheme } from '../context/ThemeContext';
+import { useTranslation } from '../i18n/I18nContext';
+import { RootState } from '../redux/store';
+import { selectUserExpenses } from '../redux/selectors';
+import { getCategoryDetails } from '../utils/category';
+import { formatGNF } from '../utils/currency';
+import { formatMonthKey, generateMonthRange, getMonthKey } from '../utils/dateUtils';
+import MonthlyAiReportModal from './MonthlyAiReportModal';
 
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+interface Expense {
+  date: string;
+  type?: string;
+  amount: number;
+  category: string;
+  status?: string;
+}
 interface Props {
   selectedMonthKey?: string | null;
   onForecastPress: () => void;
@@ -78,10 +87,12 @@ export default function Dashboard({
 }: Props) {
   const [showBarChart, setShowBarChart] = useState(true);
   const [period, setPeriod] = useState(6);
+  const [aiReportVisible, setAiReportVisible] = useState(false);
   const { width: screenWidth } = useWindowDimensions();
   const { colors } = useTheme();
   const { t, language } = useTranslation();
-  const expenses = useSelector((state: RootState) => state.expenses.expenses);
+  const expenses = useSelector(selectUserExpenses);
+  const user = useSelector((state: RootState) => state.user);
 
   const filteredExpenses = selectedMonthKey
     ? expenses.filter((exp: any) => getMonthKey(exp.date) === selectedMonthKey)
@@ -260,6 +271,40 @@ if (Platform.OS === 'web') {
       console.error('Import CSV error:', e);
     }
   };
+
+  // Prepare monthly data for AI report
+  const monthlyData = React.useMemo(() => {
+    const currentMonthKey = selectedMonthKey || getMonthKey(new Date().toLocaleDateString('fr-FR'));
+    const monthExpenses = expenses.filter((e: Expense) => getMonthKey(e.date) === currentMonthKey);
+    
+    const totalIncome = monthExpenses.filter((e: Expense) => e.type === 'income').reduce((sum: number, e: Expense) => sum + e.amount, 0);
+    const totalExpenses = monthExpenses.filter((e: Expense) => !e.type || e.type === 'expense').reduce((sum: number, e: Expense) => sum + e.amount, 0);
+    const balance = totalIncome - totalExpenses;
+
+    // Group expenses by category
+    const categoryGroups: Record<string, number> = {};
+    monthExpenses.filter((e: Expense) => !e.type || e.type === 'expense').forEach((e: Expense) => {
+      categoryGroups[e.category] = (categoryGroups[e.category] || 0) + e.amount;
+    });
+
+    // Sort categories by amount
+    const topCategories = Object.entries(categoryGroups)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5) as [string, number][];
+
+    const userName = user.firstName 
+      ? `${user.firstName}${user.lastName ? ' ' + user.lastName : ''}`
+      : "Utilisateur";
+
+    return {
+      totalIncome,
+      totalExpenses,
+      balance,
+      topCategories,
+      monthName: selectedMonthKey ? formatMonthKey(selectedMonthKey, language) : (language === 'en' ? 'Current Month' : 'Mois actuel'),
+      userName,
+    };
+  }, [expenses, selectedMonthKey, user, language]);
 
   const styles = StyleSheet.create({
     container: { marginBottom: Spacing.lg },
@@ -629,7 +674,7 @@ if (Platform.OS === 'web') {
               </View>
               {budgetAlerts.map(alert => (
                 <Text key={alert.category} style={styles.alertText}>
-                  ⚠️ <Text style={{ fontWeight: 'bold' }}>{alert.category}</Text> : {formatGNF(alert.spent)} / {formatGNF(alert.limit)} max
+                  ️ <Text style={{ fontWeight: 'bold' }}>{alert.category}</Text> : {formatGNF(alert.spent)} / {formatGNF(alert.limit)} max
                 </Text>
               ))}
             </View>
@@ -645,6 +690,18 @@ if (Platform.OS === 'web') {
           {language === 'en' ? 'Plan' : 'Planifier'} {nextMonthLabel ?? (language === 'en' ? 'next month' : 'le mois prochain')}
         </Text>
         <MaterialCommunityIcons name="chevron-right" size={18} color={colors.textMuted} />
+      </Pressable>
+
+      {/* ── AI Report Button ────────────────────────────────────────── */}
+      <Pressable 
+        style={[styles.forecastBtn, { backgroundColor: `${colors.primary}10`, borderWidth: 1, borderColor: colors.primary }]} 
+        onPress={() => setAiReportVisible(true)}
+      >
+        <MaterialCommunityIcons name="robot" size={20} color={colors.primary} />
+        <Text style={[styles.forecastBtnText, { color: colors.primary }]}>
+          {language === 'en' ? 'AI Monthly Report' : 'Rapport IA Mensuel'}
+        </Text>
+        <MaterialCommunityIcons name="chevron-right" size={18} color={colors.primary} />
       </Pressable>
 
       {/* ── Actions secondaires (période & affichage graphique) ─────── */}
@@ -718,6 +775,13 @@ if (Platform.OS === 'web') {
           </Animated.View>
         )}
       </View>
+
+      {/* ── AI Report Modal ────────────────────────────────────────── */}
+      <MonthlyAiReportModal
+        visible={aiReportVisible}
+        onClose={() => setAiReportVisible(false)}
+        monthlyData={monthlyData}
+      />
 
     </View>
   );

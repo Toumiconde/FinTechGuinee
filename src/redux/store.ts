@@ -46,6 +46,16 @@ const persistenceMiddleware = (storeAPI: any) => (next: any) => (action: any) =>
 };
 
 const supabaseSyncMiddleware = (storeAPI: any) => (next: any) => (action: any) => {
+  // Inject phone into local expense before reducer runs so selector can filter it
+  const phone = storeAPI.getState().user?.phone;
+  if (phone) {
+    if (action.type === 'expenses/addExpense') {
+      action = { ...action, payload: { ...action.payload, phone } };
+    } else if (action.type === 'expenses/addPlannedExpenses') {
+      action = { ...action, payload: (action.payload as any[]).map((p: any) => ({ ...p, phone })) };
+    }
+  }
+
   const result = next(action);
 
   if (isHydrated) {
@@ -190,6 +200,26 @@ export const store = configureStore({
 
 export type RootState = ReturnType<typeof store.getState>;
 export type AppDispatch = typeof store.dispatch;
+
+// Sync all local expenses to Supabase (called when connection is restored)
+export const syncLocalExpensesToSupabase = async (expenses: any[], phone: string) => {
+  for (const expense of expenses) {
+    try {
+      await supabase.from('expenses').upsert({
+        id: String(expense.id),
+        phone,
+        category: expense.category,
+        amount: expense.amount,
+        currency: expense.currency,
+        description: expense.description || '',
+        icon: expense.icon,
+        date: expense.date,
+        type: expense.type || 'expense',
+        status: expense.status,
+      });
+    } catch (_) {}
+  }
+};
 
 // Action de démarrage pour charger les données sauvegardées
 export const hydrateState = () => async (dispatch: any) => {

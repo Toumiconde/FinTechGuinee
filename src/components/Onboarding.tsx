@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   View, Text, TextInput, StyleSheet, Pressable,
   KeyboardAvoidingView, Platform, Image, ScrollView, StatusBar,
-  ActivityIndicator,
+  ActivityIndicator, Modal, Alert
 } from 'react-native';
 import { useDispatch } from 'react-redux';
 import { registerUser, setFullProfile } from '../redux/userSlice';
@@ -43,6 +43,12 @@ export default function Onboarding() {
   const [avatarUri,  setAvatarUri]  = useState<string | null>(null);
   const [loading,    setLoading]    = useState(false);
 
+  // OTP security states
+  const [showOtpModal, setShowOtpModal] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [userEnteredOtp, setUserEnteredOtp] = useState('');
+  const [pendingProfile, setPendingProfile] = useState<any>(null);
+
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
@@ -51,6 +57,66 @@ export default function Onboarding() {
       quality: 0.5,
     });
     if (!result.canceled) setAvatarUri(result.assets[0].uri);
+  };
+
+  const handleVerifyOtp = async () => {
+    if (userEnteredOtp === otpCode) {
+      setLoading(true);
+      setShowOtpModal(false);
+      try {
+        const profile = pendingProfile;
+        const { data: dbExpenses, error: expensesError } = await supabase
+          .from('expenses')
+          .select('*')
+          .eq('phone', profile.phone);
+        
+        if (expensesError) {
+          console.error('Failed to fetch expenses from Supabase', expensesError);
+        }
+
+        const loadedProfile = {
+          firstName: profile.first_name,
+          lastName: profile.last_name,
+          phone: profile.phone,
+          avatarSeed: profile.avatar_seed || 'Felix',
+          avatarUri: profile.avatar_uri,
+          isRegistered: true,
+          securityMode: 'none' as const,
+          biometricEnabled: false,
+          notificationsEnabled: false,
+          language: profile.language || language,
+          currency: profile.currency || 'GNF',
+        };
+
+        const mappedExpenses = (dbExpenses || []).map((exp: any) => ({
+          id: isNaN(Number(exp.id)) ? exp.id : Number(exp.id),
+          category: exp.category,
+          amount: Number(exp.amount),
+          currency: exp.currency || 'GNF',
+          description: exp.description,
+          icon: exp.icon || 'receipt',
+          date: exp.date,
+          status: exp.status || 'real',
+          type: exp.type || 'expense',
+          phone: exp.phone || profile.phone,
+        }));
+
+        dispatch(setFullProfile(loadedProfile));
+        dispatch(setExpenses(mappedExpenses));
+
+        await AsyncStorage.setItem('@user_profile', JSON.stringify(loadedProfile));
+      } catch (err) {
+        console.error("Restoration error:", err);
+      } finally {
+        setLoading(false);
+        setUserEnteredOtp('');
+      }
+    } else {
+      Alert.alert(
+        language === 'en' ? "Security Verification" : "Vérification",
+        language === 'en' ? "Incorrect code. Please try again." : "Code incorrect. Veuillez réessayer."
+      );
+    }
   };
 
   const handleStart = async () => {
@@ -91,53 +157,24 @@ export default function Onboarding() {
       }
 
       if (profile) {
-        // Utilisateur existant trouvé ! Restauration de ses données
-        alert(language === 'en' 
-          ? `Welcome back, ${profile.first_name}! Restoring your transactions...` 
-          : `Ravi de vous revoir, ${profile.first_name} ! Restauration de vos données...`
-        );
+        // Utilisateur existant trouvé ! On génère un code OTP simulé pour la sécurité
+        const generatedOtp = Math.floor(1000 + Math.random() * 9000).toString();
+        setOtpCode(generatedOtp);
+        setPendingProfile(profile);
+        setLoading(false);
+        
+        setTimeout(() => {
+          Alert.alert(
+            language === 'en' ? " Simulated SMS" : " SMS de sécurité",
+            language === 'en'
+              ? `FinTechGuinee: Your security verification code to authorize synchronization on this device is: ${generatedOtp}`
+              : `FinTechGuinee : Votre code de vérification pour autoriser la synchronisation sur cet appareil est : ${generatedOtp}`,
+            [{ text: "OK" }]
+          );
+        }, 800);
 
-        // Récupérer ses dépenses
-        const { data: dbExpenses, error: expensesError } = await supabase
-          .from('expenses')
-          .select('*')
-          .eq('phone', cleanPhone);
-
-        if (expensesError) {
-          console.error('Failed to fetch expenses from Supabase', expensesError);
-        }
-
-        const loadedProfile = {
-          firstName: profile.first_name,
-          lastName: profile.last_name,
-          phone: profile.phone,
-          avatarSeed: profile.avatar_seed || 'Felix',
-          avatarUri: profile.avatar_uri,
-          isRegistered: true,
-          securityMode: 'none' as const,
-          biometricEnabled: false,
-          notificationsEnabled: false,
-          language: profile.language || language,
-          currency: profile.currency || 'GNF',
-        };
-
-        const mappedExpenses = (dbExpenses || []).map((exp: any) => ({
-          id: isNaN(Number(exp.id)) ? Date.now() + Math.random() : Number(exp.id),
-          category: exp.category,
-          amount: Number(exp.amount),
-          currency: exp.currency || 'GNF',
-          description: exp.description,
-          icon: exp.icon || 'receipt',
-          date: exp.date,
-          status: exp.status || 'real',
-          type: exp.type || 'expense',
-        }));
-
-        dispatch(setFullProfile(loadedProfile));
-        dispatch(setExpenses(mappedExpenses));
-
-        // Sauvegarde locale complémentaire
-        await AsyncStorage.setItem('@user_profile', JSON.stringify(loadedProfile));
+        setShowOtpModal(true);
+        return;
       } else {
         // Nouvel utilisateur ! On le crée sur Supabase
         const { error: insertError } = await supabase
@@ -161,7 +198,18 @@ export default function Onboarding() {
       }
     } catch (err: any) {
       console.warn('Supabase sync error, falling back to local mode:', err.message);
-      // Mode hors-ligne en cas d'erreur de connexion
+      // Vérifier si cet utilisateur a déjà des données locales
+      const savedState = await AsyncStorage.getItem('@fintech_app_state');
+      if (savedState) {
+        const parsed = JSON.parse(savedState);
+        if (parsed.user?.phone === cleanPhone && parsed.user?.isRegistered) {
+          // Utilisateur existant retrouvé localement → charger ses données
+          dispatch({ type: 'HYDRATE_STATE', payload: parsed });
+          setLoading(false);
+          return;
+        }
+      }
+      // Nouvel utilisateur sans connexion → compte local
       alert(language === 'en'
         ? 'Connection issue. Starting in Offline Mode. Data will be saved locally.'
         : 'Problème de connexion. Démarrage en Mode Hors-ligne. Vos données seront sauvegardées localement.'
@@ -358,6 +406,98 @@ export default function Onboarding() {
       fontSize: Typography.md,
       fontWeight: Typography.bold,
     },
+
+    // OTP security modal styles
+    otpOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.6)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: Spacing.lg,
+    },
+    otpContent: {
+      backgroundColor: colors.surface,
+      borderRadius: Radius.xl,
+      padding: Spacing.xl,
+      width: '100%',
+      maxWidth: 340,
+      alignItems: 'center',
+      ...Shadows.lg,
+    },
+    otpIconWrap: {
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+      backgroundColor: `${colors.primary}15`,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: Spacing.md,
+    },
+    otpTitle: {
+      fontSize: Typography.md,
+      fontWeight: Typography.bold,
+      color: colors.text,
+      textAlign: 'center',
+      marginBottom: 6,
+    },
+    otpSub: {
+      fontSize: Typography.xs,
+      color: colors.textMuted,
+      textAlign: 'center',
+      lineHeight: 18,
+      marginBottom: Spacing.lg,
+    },
+    otpInputWrap: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.surfaceLight,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      borderRadius: Radius.md,
+      paddingHorizontal: Spacing.md,
+      width: '100%',
+      marginBottom: Spacing.md,
+    },
+    otpInput: {
+      flex: 1,
+      paddingVertical: 12,
+      color: colors.text,
+      fontSize: Typography.lg,
+      fontWeight: 'bold',
+      textAlign: 'center',
+      letterSpacing: 4,
+    },
+    otpBtnRow: {
+      flexDirection: 'row',
+      gap: 10,
+      width: '100%',
+      marginTop: Spacing.sm,
+    },
+    otpCancelBtn: {
+      flex: 1,
+      paddingVertical: 12,
+      borderRadius: Radius.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      alignItems: 'center',
+    },
+    otpCancelBtnText: {
+      color: colors.textMuted,
+      fontWeight: 'bold',
+      fontSize: Typography.sm,
+    },
+    otpConfirmBtn: {
+      flex: 1,
+      backgroundColor: colors.primary,
+      paddingVertical: 12,
+      borderRadius: Radius.md,
+      alignItems: 'center',
+    },
+    otpConfirmBtnText: {
+      color: '#fff',
+      fontWeight: 'bold',
+      fontSize: Typography.sm,
+    },
   });
 
   return (
@@ -486,6 +626,59 @@ export default function Onboarding() {
         </View>
 
       </ScrollView>
+
+      {/* ── Modal Vérification OTP (SMS) ── */}
+      <Modal visible={showOtpModal} transparent animationType="fade">
+        <View style={styles.otpOverlay}>
+          <View style={styles.otpContent}>
+            <View style={styles.otpIconWrap}>
+              <MaterialCommunityIcons name="shield-outline" size={32} color={colors.primary} />
+            </View>
+            <Text style={styles.otpTitle}>
+              {language === 'en' ? 'Security Code' : 'Code de sécurité'}
+            </Text>
+            <Text style={styles.otpSub}>
+              {language === 'en'
+                ? `Enter the 4-digit code sent to your phone to authorize this device.`
+                : `Saisissez le code à 4 chiffres envoyé par SMS pour autoriser la synchronisation.`}
+            </Text>
+
+            {/* Code de Démo visible pour simplifier le test/l'oral */}
+            <Text style={{ fontSize: 13, color: colors.primary, fontWeight: 'bold', marginBottom: 15, backgroundColor: `${colors.primary}10`, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 6, overflow: 'hidden' }}>
+              {language === 'en' ? `DEMO CODE: ${otpCode}` : `CODE DÉMO : ${otpCode}`}
+            </Text>
+
+            <View style={styles.otpInputWrap}>
+              <TextInput
+                style={styles.otpInput}
+                value={userEnteredOtp}
+                onChangeText={setUserEnteredOtp}
+                placeholder="0 0 0 0"
+                placeholderTextColor={colors.textSubtle}
+                keyboardType="numeric"
+                maxLength={4}
+              />
+            </View>
+
+            <View style={styles.otpBtnRow}>
+              <Pressable
+                style={styles.otpCancelBtn}
+                onPress={() => {
+                  setShowOtpModal(false);
+                  setUserEnteredOtp('');
+                }}
+              >
+                <Text style={styles.otpCancelBtnText}>{language === 'en' ? 'Cancel' : 'Annuler'}</Text>
+              </Pressable>
+              
+              <Pressable style={styles.otpConfirmBtn} onPress={handleVerifyOtp}>
+                <Text style={styles.otpConfirmBtnText}>{language === 'en' ? 'Confirm' : 'Confirmer'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </KeyboardAvoidingView>
   );
 }

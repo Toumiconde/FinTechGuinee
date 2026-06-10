@@ -56,7 +56,7 @@ export async function scheduleDailyReminder(hour: number = 20, minute: number = 
 
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: "FinTech Guinée 💰",
+        title: "FinTech Guinée ",
         body: "N'oubliez pas d'enregistrer vos dépenses de la journée pour garder votre budget à jour !",
         sound: true,
       },

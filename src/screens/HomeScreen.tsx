@@ -1,40 +1,45 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Picker } from '@react-native-picker/picker';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
     FlatList,
     Image,
+    Modal,
+    Platform,
     Pressable,
     SafeAreaView,
+    ScrollView,
     StatusBar,
     StyleSheet,
     Text,
     TextInput,
     View,
-    Platform,
-    Modal,
-    ScrollView,
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
+import AiChatModal from '../components/AiChatModal';
 import Dashboard from '../components/Dashboard';
+import DataMenu from '../components/DataMenu';
 import ExpenseCard from '../components/ExpenseCard';
 import ExpenseForm from '../components/ExpenseForm';
-import ForecastModal from '../components/ForecastModal';
-import LockScreen from '../components/LockScreen';
 import ExportModal from '../components/ExportModal';
-import ImportModal from '../components/ImportModal';
-import RecurringModal from '../components/RecurringModal';
+import ForecastModal from '../components/ForecastModal';
 import GoalsModal from '../components/GoalsModal';
-import DataMenu from '../components/DataMenu';
+import ImportModal from '../components/ImportModal';
+import LockScreen from '../components/LockScreen';
 import Onboarding from '../components/Onboarding';
 import ProfileModal from '../components/ProfileModal';
+import RecurringModal from '../components/RecurringModal';
+import { Radius, Shadows, Spacing, Typography } from '../constants/designTokens';
 import { useTheme } from '../context/ThemeContext';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
+import { useRecurringTransactions } from '../hooks/useRecurringTransactions';
+import { useSupabaseRealtime } from '../hooks/useSupabaseRealtime';
+import { useTranslation } from '../i18n/I18nContext';
 import { Expense } from '../redux/expenseSlice';
-import { RootState, hydrateState } from '../redux/store';
-import { setFullProfile } from '../redux/userSlice';
+import { selectUserExpenses } from '../redux/selectors';
+import { RootState, hydrateState, syncLocalExpensesToSupabase } from '../redux/store';
 import { formatGNF } from '../utils/currency';
 import {
     formatMonthKey,
@@ -43,10 +48,7 @@ import {
     getMonthKey,
     isPastMonth,
 } from '../utils/dateUtils';
-import { useRecurringTransactions } from '../hooks/useRecurringTransactions';
-import { useSupabaseRealtime } from '../hooks/useSupabaseRealtime';
-import { Radius, Shadows, Spacing, Typography } from '../constants/designTokens';
-import { useTranslation } from '../i18n/I18nContext';
+import { smartNotificationService } from '../utils/smartNotifications';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type ForecastData = {
@@ -62,7 +64,7 @@ export default function HomeScreen() {
     const { t, language } = useTranslation();
     const dispatch = useDispatch();
 
-    const allExpenses = useSelector((state: RootState) => state.expenses.expenses);
+    const allExpenses = useSelector(selectUserExpenses);
     const user        = useSelector((state: RootState) => state.user);
 
     const [isLoading,           setIsLoading]           = useState(true);
@@ -83,10 +85,27 @@ export default function HomeScreen() {
     const [showRecurringModal,  setShowRecurringModal]  = useState(false);
     const [showGoalsModal,      setShowGoalsModal]      = useState(false);
     const [showDataMenu,        setShowDataMenu]        = useState(false);
+    const [showAiChatModal,     setShowAiChatModal]     = useState(false);
 
     // ── Hooks ───────────────────────────────────────────────────────────────
     useRecurringTransactions();
     useSupabaseRealtime();
+    const networkStatus = useNetworkStatus();
+    const wasOnlineRef  = useRef<boolean | null>(null); // null = pas encore initialisé
+
+    // Quand la connexion revient après une absence, pousser toutes les dépenses locales
+    useEffect(() => {
+        const prev = wasOnlineRef.current;
+        wasOnlineRef.current = networkStatus.isOnline;
+
+        // prev === null → premier rendu, on enregistre juste l'état initial sans syncer
+        if (prev === null) return;
+
+        // prev était false et maintenant on est online → reconnexion détectée
+        if (!prev && networkStatus.isOnline && user.phone && allExpenses.length > 0) {
+            syncLocalExpensesToSupabase(allExpenses, user.phone);
+        }
+    }, [networkStatus.isOnline]);
 
     const currentMonthKey = getCurrentMonthKey();
 
@@ -141,6 +160,24 @@ export default function HomeScreen() {
             }
         });
     }, [selectedMonthKey, isLoading, autoModalShownFor]);
+
+    // Initialize smart notifications
+    useEffect(() => {
+        const initializeNotifications = async () => {
+            const hasPermission = await smartNotificationService.requestPermissions();
+            if (hasPermission) {
+                // Schedule weekly financial tips
+                await smartNotificationService.scheduleWeeklyTips();
+                
+                // Check budget alerts when forecast data changes
+                if (forecastData?.budgets) {
+                    await smartNotificationService.checkBudgetAlerts(allExpenses, forecastData.budgets);
+                }
+            }
+        };
+
+        initializeNotifications();
+    }, [forecastData, allExpenses]);
 
     const categories = [
         { name: 'Toutes',            label: t('overview'),     icon: 'apps' as const },
@@ -266,6 +303,22 @@ export default function HomeScreen() {
             borderWidth: 1,
             borderColor: colors.border,
             ...Shadows.sm,
+        },
+
+        // ── Network Banner ─────────────────────────────────────────────
+        networkBanner: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingHorizontal: Spacing.md,
+            paddingVertical: 8,
+            gap: 8,
+            borderBottomWidth: 1,
+            marginBottom: Spacing.md,
+        },
+        networkBannerText: {
+            fontSize: Typography.xs,
+            fontWeight: Typography.semiBold,
         },
 
         // ── Contenu principal ────────────────────────────────────────────
@@ -480,6 +533,16 @@ export default function HomeScreen() {
                 nextMonthLabel={formatMonthKey(nextMonthKey)}
             />
 
+            {/* Network Status Indicator */}
+            {!networkStatus.isOnline && (
+                <View style={[styles.networkBanner, { backgroundColor: `${colors.danger}15`, borderBottomColor: colors.danger }]}>
+                    <MaterialCommunityIcons name="cloud-off-outline" size={16} color={colors.danger} />
+                    <Text style={[styles.networkBannerText, { color: colors.danger }]}>
+                        {language === 'en' ? 'Offline Mode - Local data only' : 'Mode Hors Ligne - Données locales uniquement'}
+                    </Text>
+                </View>
+            )}
+
             {/* Filtres */}
             <View style={styles.filtersSection}>
                 {/* Recherche */}
@@ -607,6 +670,13 @@ export default function HomeScreen() {
                 </Pressable>
 
                 <View style={styles.headerRight}>
+                    <Pressable style={styles.iconBtn} onPress={() => setShowAiChatModal(true)}>
+                        <MaterialCommunityIcons
+                            name="robot"
+                            size={20}
+                            color={colors.primary}
+                        />
+                    </Pressable>
                     <Pressable style={styles.iconBtn} onPress={() => setShowDataMenu(true)}>
                         <MaterialCommunityIcons
                             name="swap-vertical"
@@ -677,6 +747,10 @@ export default function HomeScreen() {
                     setShowProfileModal(false);
                     setIsUnlocked(false);
                 }}
+            />
+            <AiChatModal
+                visible={showAiChatModal}
+                onClose={() => setShowAiChatModal(false)}
             />
             <ExportModal
                 visible={showExportModal}

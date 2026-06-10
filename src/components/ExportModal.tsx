@@ -69,7 +69,7 @@ export default function ExportModal({ visible, onClose }: Props) {
     setLoading(false);
 
     if (result.success) {
-      setMessage({ text: language === 'en' ? '✅ File exported successfully!' : '✅ Fichier exporté avec succès !', ok: true });
+      setMessage({ text: language === 'en' ? ' File exported successfully!' : ' Fichier exporté avec succès !', ok: true });
     } else {
       setMessage({ text: result.error ?? (language === 'en' ? 'Unknown error.' : 'Erreur inconnue.'), ok: false });
     }
@@ -229,21 +229,21 @@ export default function ExportModal({ visible, onClose }: Props) {
             <Text style={s.sectionLabel}>{language === 'en' ? 'Export preview' : "Aperçu de l'export"}</Text>
             <View style={s.previewCard}>
               <View style={s.previewRow}>
-                <Text style={s.previewLabel}>📄 {language === 'en' ? 'Number of rows' : 'Nombre de lignes'}</Text>
+                <Text style={s.previewLabel}> {language === 'en' ? 'Number of rows' : 'Nombre de lignes'}</Text>
                 <Text style={s.previewValue}>{filtered.length} transaction{filtered.length !== 1 ? 's' : ''}</Text>
               </View>
               <View style={s.divider} />
               <View style={s.previewRow}>
-                <Text style={s.previewLabel}>💚 {t('total_income')}</Text>
+                <Text style={s.previewLabel}> {t('total_income')}</Text>
                 <Text style={[s.previewValue, s.previewIncome]}>{formatGNF(totalIncome)}</Text>
               </View>
               <View style={s.previewRow}>
-                <Text style={s.previewLabel}>🔴 {t('total_expenses')}</Text>
+                <Text style={s.previewLabel}> {t('total_expenses')}</Text>
                 <Text style={[s.previewValue, s.previewExpense]}>{formatGNF(totalExpense)}</Text>
               </View>
               <View style={s.divider} />
               <View style={s.previewRow}>
-                <Text style={s.previewLabel}>⚖️ {t('balance')}</Text>
+                <Text style={s.previewLabel}>️ {t('balance')}</Text>
                 <Text style={[s.previewValue, s.previewBalance]}>{formatGNF(balance)}</Text>
               </View>
             </View>

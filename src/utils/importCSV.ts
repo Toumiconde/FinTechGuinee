@@ -1,4 +1,5 @@
 import { Expense } from '../redux/expenseSlice';
+import { v4 as uuidv4 } from 'uuid';
 
 /**
  * Detect the separator used in a CSV string (semicolon or comma)
@@ -124,7 +125,7 @@ export function parseCSV(content: string): ImportResult {
           : 'real';
 
       expenses.push({
-        id: Date.now() + i,
+        id: uuidv4(),
         date: colDate >= 0 ? parseDate(cells[colDate] ?? '') : new Date().toISOString(),
         type,
         category: cells[colCat] ?? 'Autre',

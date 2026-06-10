@@ -1,8 +1,9 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { v4 as uuidv4 } from 'uuid';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface Expense {
-  id: number;
+  id: string; // switched to UUID string
   category: string;
   amount: number;
   currency: string;
@@ -11,6 +12,7 @@ export interface Expense {
   date: string;
   status: 'real' | 'planned' | 'confirmed';
   type?: 'expense' | 'income';
+  phone?: string; // numéro du propriétaire de la dépense
 }
 
 interface Statistics {
@@ -62,7 +64,7 @@ const expenseSlice = createSlice({
     ) => {
       const newExpense: Expense = {
         ...action.payload,
-        id: Date.now(),
+        id: uuidv4(),
         status: 'real',
       };
       state.expenses.unshift(newExpense);
@@ -75,7 +77,7 @@ const expenseSlice = createSlice({
     ) => {
       const planned: Expense[] = action.payload.map((exp, i) => ({
         ...exp,
-        id: Date.now() + i,
+        id: uuidv4(),
         status: 'planned',
       }));
       state.expenses.unshift(...planned);
@@ -92,7 +94,7 @@ const expenseSlice = createSlice({
 
     confirmPlannedExpense: (
       state,
-      action: PayloadAction<{ id: number; realAmount: number }>
+      action: PayloadAction<{ id: string; realAmount: number }>
     ) => {
       const index = state.expenses.findIndex(e => e.id === action.payload.id);
       if (index !== -1) {

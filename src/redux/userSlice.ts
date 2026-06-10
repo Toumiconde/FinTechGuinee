@@ -18,6 +18,7 @@ export interface UserProfile {
   exportDirectoryUri?: string | null;
   themePreference?: 'system' | 'light' | 'dark';
   currency?: string;
+  geminiApiKey?: string | null;
 }
 
 const initialState: UserProfile = {
@@ -38,6 +39,7 @@ const initialState: UserProfile = {
   exportDirectoryUri: null,
   themePreference: 'system',
   currency: 'GNF',
+  geminiApiKey: null,
 };
 
 const userSlice = createSlice({
@@ -62,6 +64,7 @@ const userSlice = createSlice({
       state.exportDirectoryUri = action.payload.exportDirectoryUri || null;
       state.themePreference = action.payload.themePreference || 'system';
       state.currency = action.payload.currency || 'GNF';
+      state.geminiApiKey = action.payload.geminiApiKey || null;
     },
     updateProfile: (state, action: PayloadAction<Partial<UserProfile>>) => {
       if (action.payload.firstName) state.firstName = action.payload.firstName;
@@ -80,6 +83,7 @@ const userSlice = createSlice({
       if (action.payload.exportDirectoryUri !== undefined) state.exportDirectoryUri = action.payload.exportDirectoryUri;
       if (action.payload.themePreference !== undefined) state.themePreference = action.payload.themePreference;
       if (action.payload.currency !== undefined) state.currency = action.payload.currency;
+      if (action.payload.geminiApiKey !== undefined) state.geminiApiKey = action.payload.geminiApiKey;
     },
     setFullProfile: (state, action: PayloadAction<UserProfile>) => {
       state.firstName = action.payload.firstName;
@@ -99,6 +103,7 @@ const userSlice = createSlice({
       state.exportDirectoryUri = action.payload.exportDirectoryUri || null;
       state.themePreference = action.payload.themePreference || 'system';
       state.currency = action.payload.currency || 'GNF';
+      state.geminiApiKey = action.payload.geminiApiKey || null;
     },
     logout: (state) => {
       state.isRegistered = false;

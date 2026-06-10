@@ -284,17 +284,17 @@ export default function ImportModal({ visible, onClose }: Props) {
               <>
                 <View style={s.summaryCard}>
                   <View style={s.summaryRow}>
-                    <Text style={s.summaryLabel}>📄 {language === 'en' ? 'File' : 'Fichier'}</Text>
+                    <Text style={s.summaryLabel}> {language === 'en' ? 'File' : 'Fichier'}</Text>
                     <Text style={s.summaryValue} numberOfLines={1}>{fileName}</Text>
                   </View>
                   <View style={s.divider} />
                   <View style={s.summaryRow}>
-                    <Text style={s.summaryLabel}>✅ {language === 'en' ? 'Transactions found' : 'Transactions trouvées'}</Text>
+                    <Text style={s.summaryLabel}> {language === 'en' ? 'Transactions found' : 'Transactions trouvées'}</Text>
                     <Text style={[s.summaryValue, { color: colors.success }]}>{parsed.expenses.length}</Text>
                   </View>
                   {parsed.skipped > 0 && (
                     <View style={s.summaryRow}>
-                      <Text style={s.summaryLabel}>⚠️ {language === 'en' ? 'Skipped rows' : 'Lignes ignorées'}</Text>
+                      <Text style={s.summaryLabel}>️ {language === 'en' ? 'Skipped rows' : 'Lignes ignorées'}</Text>
                       <Text style={[s.summaryValue, { color: colors.warning }]}>{parsed.skipped}</Text>
                     </View>
                   )}

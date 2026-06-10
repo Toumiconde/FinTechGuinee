@@ -3,7 +3,8 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import React, { useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
-import { BarChart, PieChart } from 'react-native-chart-kit';
+import { PieChart } from 'react-native-chart-kit';
+import TrendChart from './TrendChart';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSelector } from 'react-redux';
 import { Radius, Shadows, Spacing, Typography } from '../constants/designTokens';
@@ -192,26 +193,30 @@ export default function Dashboard({
       legendFontColor: colors.textMuted,
       legendFontSize: 11,
     }));
-  // ---- Bar‑Chart data (monthly expenses) ----
-  const monthKeys = generateMonthRange(-period + 1, 0); // e.g., period=6 => last 6 months
-  const barValues = monthKeys.map((mk) =>
-    displayedExpenses
+  // ---- Trend data (dépenses & revenus par mois) ----
+  const monthKeys = generateMonthRange(period - 1, 0);
+  const trendData = monthKeys.map((mk) => {
+    const [month] = mk.split('-');
+    const label = new Date(2000, parseInt(month) - 1).toLocaleString(
+      language === 'en' ? 'en-US' : 'fr-FR',
+      { month: 'short' },
+    );
+    const depenses = displayedExpenses
       .filter((e: any) => getMonthKey(e.date) === mk && (!e.type || e.type === 'expense'))
-      .reduce((s: number, cur: any) => s + cur.amount, 0)
-  );
-  const barChartData = {
-    labels: monthKeys.map((mk) => formatMonthKey(mk, language)),
-    datasets: [{ data: barValues }],
-  };
-  // expose both datasets
-  return { pie, barChartData };
+      .reduce((s: number, cur: any) => s + cur.amount, 0);
+    const revenus = displayedExpenses
+      .filter((e: any) => getMonthKey(e.date) === mk && e.type === 'income')
+      .reduce((s: number, cur: any) => s + cur.amount, 0);
+    return { month: label, depenses, revenus };
+  });
+  return { pie, trendData };
 })();
   // Export chart data as CSV and share via Expo Sharing (or download on web)
   const exportChartData = async () => {
     console.log('Export button pressed');
     try {
               // Build detailed CSV with expense, income, and balance per month
-        const monthKeys = generateMonthRange(-period + 1, 0);
+        const monthKeys = generateMonthRange(period - 1, 0);
         const rows = monthKeys.map(mk => {
           const monthLabel = formatMonthKey(mk, language);
           const expense = displayedExpenses
@@ -755,22 +760,14 @@ if (Platform.OS === 'web') {
             {language === 'en' ? 'No data for this month.' : 'Aucune donnée pour ce mois-ci.'}
           </Text>
         )}
-        {/* Bar‑Chart – dépenses mensuelles */}
+        {/* Trend chart – évolution dépenses & revenus */}
         {showBarChart && (
           <Animated.View entering={FadeIn.duration(400)} style={{ marginTop: Spacing.md }}>
-            <BarChart
-              data={chartData.barChartData}
-              width={screenWidth - 80}
-              height={180}
-              yAxisLabel=""
-              yAxisSuffix=""
-              chartConfig={{
-                backgroundColor: colors.surface,
-                backgroundGradientFrom: colors.surface,
-                backgroundGradientTo: colors.surface,
-                color: (opacity = 1) => `rgba(99,102,241,${opacity})`,
-                labelColor: () => colors.textMuted,
-              }}
+            <TrendChart
+              data={chartData.trendData}
+              colors={colors}
+              formatValue={formatGNF}
+              language={language}
             />
           </Animated.View>
         )}

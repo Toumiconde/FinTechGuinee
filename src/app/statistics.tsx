@@ -1,5 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSelector } from 'react-redux';
 import { Radius, Spacing, Typography } from '../constants/designTokens';
 import { useTheme } from '../context/ThemeContext';
@@ -11,6 +12,7 @@ import Dashboard from '../components/Dashboard';
 
 export default function StatisticsScreen() {
   const { colors } = useTheme();
+  const router = useRouter();
   const expenses = useSelector(selectUserExpenses);
   const user = useSelector((state: RootState) => state.user);
 
@@ -73,12 +75,13 @@ export default function StatisticsScreen() {
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       {/* ── Header page (mobile uniquement — web a la sidebar) ── */}
-      {Platform.OS !== 'web' && (
-        <View style={[styles.mobileHeader, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-          <MaterialCommunityIcons name="chart-bar" size={22} color={colors.primary} />
-          <Text style={[styles.pageTitle, { color: colors.text }]}>Statistiques</Text>
-        </View>
-      )}
+      <View style={[styles.mobileHeader, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        <Pressable onPress={() => router.back()} style={{ padding: 4, marginRight: 8 }}>
+          <MaterialCommunityIcons name="arrow-left" size={22} color={colors.text} />
+        </Pressable>
+        <MaterialCommunityIcons name="chart-bar" size={22} color={colors.primary} />
+        <Text style={[styles.pageTitle, { color: colors.text }]}>Statistiques</Text>
+      </View>
 
       <ScrollView
         style={{ flex: 1 }}

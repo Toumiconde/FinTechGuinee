@@ -1,5 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
@@ -29,6 +30,7 @@ import GoalsModal from '../components/GoalsModal';
 import ImportModal from '../components/ImportModal';
 import LockScreen from '../components/LockScreen';
 import Onboarding from '../components/Onboarding';
+import WebWelcome from '../components/WebWelcome';
 import ProfileModal from '../components/ProfileModal';
 import RecurringModal from '../components/RecurringModal';
 import { Radius, Shadows, Spacing, Typography } from '../constants/designTokens';
@@ -61,6 +63,7 @@ type ForecastData = {
 // ─── Composant ────────────────────────────────────────────────────────────────
 export default function HomeScreen() {
     const { theme, toggleTheme, colors } = useTheme();
+    const router = useRouter();
     const { t, language } = useTranslation();
     const dispatch = useDispatch();
 
@@ -636,7 +639,7 @@ export default function HomeScreen() {
         );
     }
 
-    if (!user.isRegistered) return <Onboarding />;
+    if (!user.isRegistered) return Platform.OS === 'web' ? <WebWelcome /> : <Onboarding />;
 
     if (user.securityMode !== 'none' && !isUnlocked) {
         return <LockScreen onUnlock={() => setIsUnlocked(true)} user={user} />;
@@ -670,6 +673,13 @@ export default function HomeScreen() {
                 </Pressable>
 
                 <View style={styles.headerRight}>
+                    <Pressable style={styles.iconBtn} onPress={() => router.push('/statistics')}>
+                        <MaterialCommunityIcons
+                            name="chart-bar"
+                            size={20}
+                            color={colors.text}
+                        />
+                    </Pressable>
                     <Pressable style={styles.iconBtn} onPress={() => setShowAiChatModal(true)}>
                         <MaterialCommunityIcons
                             name="robot"

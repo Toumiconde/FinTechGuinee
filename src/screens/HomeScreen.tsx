@@ -10,6 +10,7 @@ import {
     Modal,
     Platform,
     Pressable,
+    RefreshControl,
     SafeAreaView,
     ScrollView,
     StatusBar,
@@ -18,6 +19,9 @@ import {
     TextInput,
     View,
 } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+// Animated used below for FAB wrapper
+import { haptic } from '../utils/haptics';
 import { useDispatch, useSelector } from 'react-redux';
 import AiChatModal from '../components/AiChatModal';
 import Dashboard from '../components/Dashboard';
@@ -89,6 +93,32 @@ export default function HomeScreen() {
     const [showGoalsModal,      setShowGoalsModal]      = useState(false);
     const [showDataMenu,        setShowDataMenu]        = useState(false);
     const [showAiChatModal,     setShowAiChatModal]     = useState(false);
+    const [refreshing,          setRefreshing]          = useState(false);
+
+    // ── Animation FAB ───────────────────────────────────────────────────────
+    const fabScale = useSharedValue(1);
+    const fabAnimStyle = useAnimatedStyle(() => ({
+        transform: [{ scale: fabScale.value }],
+    }));
+
+    const onFabPress = () => {
+        haptic.medium();
+        fabScale.value = withSpring(0.88, { damping: 8 }, () => {
+            fabScale.value = withSpring(1, { damping: 6 });
+        });
+        handleAddExpense();
+    };
+
+    const onRefresh = useCallback(async () => {
+        haptic.light();
+        setRefreshing(true);
+        try {
+            if (user.phone && allExpenses.length > 0) {
+                await syncLocalExpensesToSupabase(allExpenses, user.phone);
+            }
+        } catch (_) {}
+        setRefreshing(false);
+    }, [allExpenses, user.phone]);
 
     // ── Hooks ───────────────────────────────────────────────────────────────
     useRecurringTransactions();
@@ -460,6 +490,20 @@ export default function HomeScreen() {
             fontSize: Typography.sm,
             lineHeight: 20,
         },
+        emptyBtn: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6,
+            marginTop: Spacing.lg,
+            paddingHorizontal: Spacing.lg,
+            paddingVertical: 12,
+            borderRadius: Radius.lg,
+        },
+        emptyBtnText: {
+            color: '#fff',
+            fontSize: Typography.sm,
+            fontWeight: '700',
+        },
 
         // ── FAB ───────────────────────────────────────────────────────────
         fab: {
@@ -470,9 +514,14 @@ export default function HomeScreen() {
             height: 60,
             borderRadius: 30,
             backgroundColor: colors.primary,
+            ...Shadows.primary(colors.primary),
+        },
+        fabInner: {
+            width: 60,
+            height: 60,
+            borderRadius: 30,
             justifyContent: 'center',
             alignItems: 'center',
-            ...Shadows.primary(colors.primary),
         },
 
         // Custom Month Modal
@@ -673,33 +722,17 @@ export default function HomeScreen() {
                 </Pressable>
 
                 <View style={styles.headerRight}>
-                    <Pressable style={styles.iconBtn} onPress={() => router.push('/statistics')}>
-                        <MaterialCommunityIcons
-                            name="chart-bar"
-                            size={20}
-                            color={colors.text}
-                        />
+                    <Pressable style={styles.iconBtn} onPress={() => { haptic.select(); router.push('/statistics'); }}>
+                        <MaterialCommunityIcons name="chart-bar" size={20} color={colors.text} />
                     </Pressable>
-                    <Pressable style={styles.iconBtn} onPress={() => setShowAiChatModal(true)}>
-                        <MaterialCommunityIcons
-                            name="robot"
-                            size={20}
-                            color={colors.primary}
-                        />
+                    <Pressable style={styles.iconBtn} onPress={() => { haptic.select(); setShowAiChatModal(true); }}>
+                        <MaterialCommunityIcons name="robot" size={20} color={colors.primary} />
                     </Pressable>
-                    <Pressable style={styles.iconBtn} onPress={() => setShowDataMenu(true)}>
-                        <MaterialCommunityIcons
-                            name="swap-vertical"
-                            size={20}
-                            color={colors.text}
-                        />
+                    <Pressable style={styles.iconBtn} onPress={() => { haptic.select(); setShowDataMenu(true); }}>
+                        <MaterialCommunityIcons name="swap-vertical" size={20} color={colors.text} />
                     </Pressable>
-                    <Pressable style={styles.iconBtn} onPress={toggleTheme}>
-                        <MaterialCommunityIcons
-                            name={theme === 'dark' ? 'weather-sunny' : 'weather-night'}
-                            size={20}
-                            color={colors.text}
-                        />
+                    <Pressable style={styles.iconBtn} onPress={() => { haptic.light(); toggleTheme(); }}>
+                        <MaterialCommunityIcons name={theme === 'dark' ? 'weather-sunny' : 'weather-night'} size={20} color={colors.text} />
                     </Pressable>
                 </View>
             </View>
@@ -725,13 +758,28 @@ export default function HomeScreen() {
                         }}
                     />
                 )}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        colors={[colors.primary]}
+                        tintColor={colors.primary}
+                    />
+                }
                 ListEmptyComponent={
                     <View style={styles.emptyContainer}>
                         <View style={styles.emptyIconWrap}>
-                            <MaterialCommunityIcons name="receipt-text-outline" size={36} color={colors.primary} />
+                            <MaterialCommunityIcons name="receipt-text-outline" size={48} color={colors.primary} />
                         </View>
                         <Text style={styles.emptyTitle}>{t('no_transactions')}</Text>
                         <Text style={styles.emptyText}>{t('no_transactions_sub')}</Text>
+                        <Pressable
+                            style={[styles.emptyBtn, { backgroundColor: colors.primary }]}
+                            onPress={() => { haptic.light(); handleAddExpense(); }}
+                        >
+                            <MaterialCommunityIcons name="plus" size={18} color="#fff" />
+                            <Text style={styles.emptyBtnText}>Ajouter une transaction</Text>
+                        </Pressable>
                     </View>
                 }
             />
@@ -789,10 +837,12 @@ export default function HomeScreen() {
                 anchorTop={70}
             />
 
-            {/* ── FAB ──────────────────────────────────── */}
-            <Pressable style={styles.fab} onPress={handleAddExpense}>
-                <MaterialCommunityIcons name="plus" size={30} color="#FFF" />
-            </Pressable>
+            {/* ── FAB animé ────────────────────────────── */}
+            <Animated.View style={[styles.fab, fabAnimStyle]}>
+                <Pressable style={styles.fabInner} onPress={onFabPress}>
+                    <MaterialCommunityIcons name="plus" size={30} color="#FFF" />
+                </Pressable>
+            </Animated.View>
 
             {/* Modal de sélection de mois personnalisé */}
             <Modal visible={monthPickerVisible} transparent animationType="fade" onRequestClose={() => setMonthPickerVisible(false)}>

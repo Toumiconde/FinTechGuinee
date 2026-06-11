@@ -1,29 +1,57 @@
 {
   "expo": {
-    "name": "FinTechGuinee",
+    "name": "FinTech Guinée",
     "slug": "FinTechGuinee",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "fintechguinee",
     "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
     "ios": {
-      "icon": "./assets/expo.icon",
-      "bundleIdentifier": "com.toumiconde.fintechguinee"
+      "supportsTablet": false,
+      "bundleIdentifier": "com.toumiconde.fintechguinee",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Utilisé pour choisir une photo de profil.",
+        "NSPhotoLibraryUsageDescription": "Utilisé pour choisir une photo de profil.",
+        "NSMicrophoneUsageDescription": "Utilisé pour les commandes vocales de l'assistant IA.",
+        "NSSpeechRecognitionUsageDescription": "Utilisé pour les commandes vocales de l'assistant IA."
+      }
     },
     "android": {
       "package": "com.toumiconde.fintechguinee",
+      "versionCode": 1,
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "monochromeImage": "./assets/images/android-icon-monochrome.png",
+        "backgroundColor": "#208AEF"
       },
-      "predictiveBackGestureEnabled": false
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.VIBRATE",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.USE_EXACT_ALARM",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE"
+      ],
+      "androidStatusBar": {
+        "barStyle": "light-content",
+        "backgroundColor": "#208AEF",
+        "translucent": false
+      },
+      "softwareKeyboardLayoutMode": "pan",
+      "predictiveBackGestureEnabled": true
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/favicon.png",
+      "bundler": "metro"
     },
     "plugins": [
       "expo-router",
@@ -31,10 +59,36 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#208AEF",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
           "android": {
             "image": "./assets/images/splash-icon.png",
-            "imageWidth": 76
+            "imageWidth": 150,
+            "backgroundColor": "#208AEF"
           }
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#208AEF",
+          "androidMode": "default",
+          "androidCollapsedTitle": "FinTech Guinée"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Accès à vos photos pour choisir un avatar.",
+          "cameraPermission": "Accès à la caméra pour prendre une photo de profil."
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Utilisé pour sécuriser l'accès à votre compte FinTech Guinée."
         }
       ],
       "expo-sharing",
